@@ -383,6 +383,14 @@ path_sample=function(sampling_model,data_list, visualize_progress=FALSE,
 
 
 
+g_lambda=function(a){
+	a_reflected = 1 - abs(1 - a)
+	a_scaled <- (a_reflected - a_lower)/(a_upper - a_lower)
+	lambda <- ifelse(a_scaled <= 0, 0, ifelse(a_scaled < 1, 0.5 + 0.25*(3*(2*a_scaled - 1) - (2*a_scaled - 1)^3), 1))
+	return(lambda)
+}
+
+
 cat("Compiling Stan optimizer...")
 update_model <- stan_model("solve_tempering.stan")
 cat("done.\n")
