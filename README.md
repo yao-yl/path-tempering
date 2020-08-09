@@ -76,7 +76,7 @@ gap ~ cauchy(theta, 0.5);
 ```
 This will not work in stan with large `gap`. It exhibits posterior bimodality  and a large R hat if running multiple chains. 
 
-A User only need to specify a base model,  say N$(0,5)$,  and list it in an  \texttt{alternative model} block as if it is a regular model.   
+A user only needs to specify a base model,  which can be the prior, or some better-shaped posterior approximation.   Just write it in an  \texttt{alternative model} block as if it is a regular model.    
  
 ```stan
 ...
