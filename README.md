@@ -12,7 +12,7 @@ Code for paper  *Adaptive Path Sampling in Metastable Posterior Distributions* b
 
 In either case, just add another module `alternative model` to your stan code. For example, you want to sample a bimdoal distribution with a hot start:
 
-```
+```stan
 ...
 model{
 theta ~ cauchy(-10, 0.5);
@@ -25,7 +25,7 @@ theta ~ normal (0,5);
 
 Or maybe you are fitting a logit link and a probit link at the same time, which only requires to add an `alternative model` as if you have new models.
 
-```
+```stan
 data{
 int y[n];
 real x[n];
@@ -42,7 +42,7 @@ y ~  bernoulli(Phi(x* beta));
 ```
 
 For the third use, simply put the prior part into the alternative model:
-```
+```stan
 data{
 int y[n];
 real x[n];
@@ -62,7 +62,7 @@ beta ~ normal(0,1);
 
 ## Example:
 Let's first construct a simple bimodal density:
-```
+```stan
 data {
   real gap;
 }
@@ -78,7 +78,7 @@ This will not work in stan with large `gap`. It exhibits posterior bimodality  a
 
 A User only need to specify a base model,  say N$(0,5)$,  and list it in an  \texttt{alternative model} block as if it is a regular model.   
  
-```
+```stan
 ...
 model{ // keep the original model  
  y~ cauchy(theta,0.2);   
