@@ -81,8 +81,8 @@ A user only needs to specify a base model,  which can be the prior, or some bett
 ```stan
 ...
 model{ // keep the original model  
- y~ cauchy(theta,0.2);   
- -y~ cauchy(theta,0.2);   
+ gap~ cauchy(theta,0.2);   
+ -gap~ cauchy(theta,0.2);   
 }
 alternative model{ // add a new block 
  theta~ normal(0,5);   
