@@ -23,7 +23,7 @@ theta ~ normal (0,5);
 }
 ```
 
-Or maybe you are fitting a logit link and a probit link at the same time, which only requries to add an `alternative model` as if you have new models.
+Or maybe you are fitting a logit link and a probit link at the same time, which only requires to add an `alternative model` as if you have new models.
 
 ```
 data{
@@ -60,8 +60,8 @@ beta ~ normal(0,1);
 ```
 
 
-## Exmple:
-Let's first constuct a simple bimodal density:
+## Example:
+Let's first construct a simple bimodal density:
 ```
 data {
   real gap;
@@ -74,7 +74,7 @@ gap ~ cauchy(theta, 0.5);
 -gap ~ cauchy(theta, 0.5);
 }
 ```
-This will not work in stan with large `gap`. It exhibits posteiror bimodality  and a large R hat if running multiple chains. 
+This will not work in stan with large `gap`. It exhibits posterior bimodality  and a large R hat if running multiple chains. 
 
 A User only need to specify a base model,  say N$(0,5)$,  and list it in an  \texttt{alternative model} block as if it is a regular model.   
  
@@ -89,7 +89,7 @@ alternative model{ // add a new block
 }
 ```
 
-After saving this stan code to a  `cauchy.stan`, we run the function `code_tempeture_argument()` that automatically constructs a tempered path between the orginal model and the alternative model:
+After saving this stan code to a  `cauchy.stan`, we run the function `code_tempeture_argument()` that automatically constructs a tempered path between the original model and the alternative model:
 
 ```
 source("tempering_function.R")
@@ -110,8 +110,7 @@ sampling_model=stan_model(file_new)
 path_sample_fit=path_sample(sampling_model=sampling_model, data=list(gap=10), N_loop = 6, visualize_progress = TRUE, iter_final=6000 )
 ```
 
-The returned value `path_sample_fit` provides access to the draw  the posterior draws from the target density and base density, the 
-joint path and the normalization constant:
+The returned value `path_sample_fit` provides access to the draw  the posterior draws from the target density and base density, the  joint path and the normalization constant:
 ```
 sim_cauchy=extract(path_sample_fit$fit_main)
 in_target= sim_cauchy$lambda==1
@@ -129,4 +128,6 @@ Here is the output:
 ![cauchy exampl output](/example/img/Cauchy.jpg)
 
  
+
+
 
