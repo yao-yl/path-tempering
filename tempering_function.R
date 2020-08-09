@@ -171,7 +171,7 @@ code_tempeture_argument=function(stan_file=NULL){
 	}
 	
 	
-	tempering_file=sub(".stan","_argumented.stan" ,stan_file)	
+	tempering_file=sub(".stan","_augmented.stan" ,stan_file)	
 	writeLines(stan_code_new, tempering_file)
 	cat(paste("A new stan file has been created:",tempering_file, "\n"  ))
 	return(tempering_file)
