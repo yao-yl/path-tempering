@@ -47,5 +47,4 @@ transformed parameters {
 }
 model {
   log_p ~ normal(fit, sigma_err);
-  b_gaussian~normal(0,6);
 }
