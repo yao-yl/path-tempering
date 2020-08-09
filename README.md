@@ -57,11 +57,14 @@ path_sample_fit=path_sample(sampling_model=sampling_model, data=list(gap=10), N_
 
 ```
 
-It is easy to monitor any any in target samples:
+It is easy to access all  samples coming form the target or the base:
 ```
 sim_cauchy=extract(path_sample_fit$fit_main)
 in_target= sim_cauchy$lambda==1
 hist(sim_cauchy$theta[in_target], breaks = 30)
+
+in_base= sim_cauchy$lambda==0  
+hist(sim_cauchy$theta[in_base], breaks = 30)
 ```
 
 
