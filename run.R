@@ -16,14 +16,13 @@ path_sample_fit=path_sample(sampling_model=sampling_model, data=list(gap=10), N_
 # collect final samples
 sim_cauchy=extract(path_sample_fit$fit_main)
 in_target= sim_cauchy$lambda==1
-sim_cauchy=extract(path_sample_fit$fit_main)
 in_prior = sim_cauchy$lambda==0
 
 
 # sample from the target 
-hist(sim_cauchy$theta[in_target], breaks = 30, prob=T)
+hist(sim_cauchy$theta[in_target])
 # sample from the base 
-hist(sim_cauchy$theta[in_prior], breaks = 30)
+hist(sim_cauchy$theta[in_prior])
 # the "path"
 plot(sim_cauchy$a, sim_cauchy$theta)
 # the normalization constant
