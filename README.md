@@ -36,7 +36,7 @@ model{
 y ~  binomial_logit(1, x* beta);
 }
 alternative model{
-y ~  bernoulli(Phi(x* beta);
+y ~  bernoulli(Phi(x* beta));
 }
 ```
 For exmple, run the code 
