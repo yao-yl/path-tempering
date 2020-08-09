@@ -110,7 +110,7 @@ sampling_model=stan_model(file_new)
 path_sample_fit=path_sample(sampling_model=sampling_model, data=list(gap=10), N_loop = 6, visualize_progress = TRUE, iter_final=6000 )
 ```
 
-The returned value `path_sample_fit` provides access to the draw  the posterior draws $\theta$ from the target density and base density, the 
+The returned value `path_sample_fit` provides access to the draw  the posterior draws from the target density and base density, the 
 joint path and the normalization constant:
 ```
 sim_cauchy=extract(path_sample_fit$fit_main)
@@ -125,6 +125,7 @@ plot(sim_cauchy$a, sim_cauchy$theta)
 # the normalization constant
 plot(g_lambda(path_sample_fit$path_post_a), path_sample_fit$path_post_z)
 ```
+Here is the output:
 ![cauchy exampl output](/example/img/Cauchy.jpg)
 
  
