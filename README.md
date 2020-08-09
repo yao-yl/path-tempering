@@ -61,37 +61,71 @@ beta ~ normal(0,1);
 
 
 ## Exmple:
-Run code 
-```file_new=code_tempeture_argument(stan_file="example/cauchy_mixture.stan")```
-will generate a new working stan model.
+Let's first constuct a simple bimodal density:
+```
+data {
+  real gap;
+}
+parameters {
+  real theta;
+}
+model{
+gap ~ cauchy(theta, 0.5);
+-gap ~ cauchy(theta, 0.5);
+}
+```
+This will not work in stan with large `gap`. It exhibits posteiror bimodality  and a large R hat if running multiple chains. 
 
-To run this example, use
+A User only need to specify a base model,  say N$(0,5)$,  and list it in an  \texttt{alternative model} block as if it is a regular model.   
+ 
+```
+...
+model{ // keep the original model  
+ y~ cauchy(theta,0.2);   
+ -y~ cauchy(theta,0.2);   
+}
+alternative model{ // add a new block 
+ theta~ normal(0,5);   
+}
+```
+
+After saving this stan code to a  `cauchy.stan`, we run the function `code_tempeture_argument()` that automatically constructs a tempered path between the orginal model and the alternative model:
+
+```
+source("tempering_function.R")
+file_new=code_tempeture_argument(stan_file="example/cauchy_mixture.stan")
+> output:
+> A new stan file has been created: cauchy_augmented.stan.
+```
+
+We have automated path sampling and its adaptation into a function `path_sample()`.
+To run this example, call
 ```
 library(rstan)
 rstan_options(auto_write = TRUE)
 # currently only supports 1 chain
-source("tempering_function.R") 
 # generate the new stan file, please check if it is OK.
-file_new=code_tempeture_argument(stan_file="example/cauchy_mixture.stan")
 # compile the new working model
 sampling_model=stan_model(file_new)
-path_sample_fit=path_sample(sampling_model=sampling_model, data=list(gap=10), N_loop = 6, visualize_progress = TRUE )
-
+path_sample_fit=path_sample(sampling_model=sampling_model, data=list(gap=10), N_loop = 6, visualize_progress = TRUE, iter_final=6000 )
 ```
 
-It is easy to access all  samples coming form the target or the base:
+The returned value `path_sample_fit` provides access to the draw  the posterior draws $\theta$ from the target density and base density, the 
+joint path and the normalization constant:
 ```
 sim_cauchy=extract(path_sample_fit$fit_main)
 in_target= sim_cauchy$lambda==1
-hist(sim_cauchy$theta[in_target], breaks = 30)
+in_prior = sim_cauchy$lambda==0
+# sample from the target 
+hist(sim_cauchy$theta[in_target])
+# sample from the base 
+hist(sim_cauchy$theta[in_prior])
+# the joint "path"
+plot(sim_cauchy$a, sim_cauchy$theta)
+# the normalization constant
+plot(g_lambda(path_sample_fit$path_post_a), path_sample_fit$path_post_z)
+```
+![cauchy exampl output](/example/img/Cauchy.jpg)
 
-in_base= sim_cauchy$lambda==0  
-hist(sim_cauchy$theta[in_base], breaks = 30)
-```
-
-Finally, the normalization constant can be accessed by 
-`path_sample_fit$path_post_z`. It estimates the profile of log  normalization constant:
-```
-qplot(path_sample_fit$path_post_a, path_sample_fit$path_post_z)
-```
+ 
 
