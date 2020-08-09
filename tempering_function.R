@@ -383,6 +383,6 @@ path_sample=function(sampling_model,data_list, visualize_progress=FALSE,
 
 
 
-cat("Compling Stan optimizer...")
+cat("Compiling Stan optimizer...")
 update_model <- stan_model("solve_tempering.stan")
 cat("done.\n")
