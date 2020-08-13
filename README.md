@@ -5,7 +5,7 @@ Code for paper  *Adaptive Path Sampling in Metastable Posterior Distributions* b
 ## Usage:
 `source("tempering_function.R")` will load all functions.  
 
-`code_tempeture_argument()` constructs a geometric bridge between two densitis. It can often be driven by three motivations:
+`code_tempeture_augment()` constructs a geometric bridge between two densitis. It can often be driven by three motivations:
 1. In metastable sampling, we want to start from an easy-to-sample base density, which guides the target sampling. 
 2. In model expansion, we want to work with multiple models. We may also want to fit two models at the same time for both computation efficiency and model comparison. 
 3. We want to compute the marginal likelihood, or Bayes factor of two models.
@@ -89,11 +89,11 @@ alternative model{ // add a new block
 }
 ```
 
-After saving this stan code to a  `cauchy.stan`, we run the function `code_tempeture_argument()` that automatically constructs a tempered path between the original model and the alternative model:
+After saving this stan code to a  `cauchy.stan`, we run the function `code_tempeture_augment()` that automatically constructs a tempered path between the original model and the alternative model:
 
 ```
 source("tempering_function.R")
-file_new=code_tempeture_argument(stan_file="example/cauchy_mixture.stan")
+file_new=code_tempeture_augment(stan_file="example/cauchy_mixture.stan")
 > output:
 > A new stan file has been created: cauchy_augmented.stan.
 ```
