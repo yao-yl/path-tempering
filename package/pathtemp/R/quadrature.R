@@ -7,15 +7,15 @@
 #' @param a a vector, all sampled transformed parameters.
 #' @param u a vector, pointwise gradient at those points.
 #' @param  a_lower The lower bound of the quadrature. When a < a_lower, the invse
-#' temperture  is 0 and the sample is from the base.
+#' temperature  is 0 and the sample is from the base.
 #' @param a_upper The upper bound of the quadrature. When a > a_upper, the invse
-#' temperture  is 1 and the sample is from the target.
+#' temperature  is 1 and the sample is from the target.
 
 #'
 #' @details The function use numerical quadrature using trapezoid rule to compute
 #' the normalization constant from its potinwise gradient \code{u}.
 #'
-#' @return The pointwise   log normalization constant at all a.
+#' @return The pointwise  log normalization constant at all a.
 #'
 #
 path_quadrature <- function(a, u, a_lower=0.1, a_upper=0.8){
