@@ -85,7 +85,7 @@ aug_string_model=c(
 	"\ttarget += dot_product(kernel_logit, b_logit) + dot_product(kernel_gaussian, b_gaussian);"
 )
 
-code_tempeture_augment=function(stan_file=NULL){
+code_temperature_augment=function(stan_file=NULL){
 	stan_code=readLines(stan_file)
 	if(sum(grep(" a;| a\\[| a ", stan_code))+ sum(grep(" lambda;| lambda\\[| lambda ", stan_code))>0 ) 
 		stop("Please reserve parameter name a and lambda")
@@ -177,7 +177,7 @@ code_tempeture_augment=function(stan_file=NULL){
 	return(tempering_file)
 }
 
-path_sampling <- function(a, u, a_lower=0, a_upper=1){
+path_quadrature <- function(a, u, a_lower=0, a_upper=1){
 	keep <- (a > a_lower) & (a < a_upper)
 	if (sum(keep) > 0){
 		a_uniq <- sort(unique(a[keep]))
@@ -269,8 +269,8 @@ path_initialize=function(){
 
 
 
-extract_lp=function(){
-	stan_out=readLines('stan-output_path.txt')
+extract_lp=function(output_file='stan-output_path.txt'){
+	stan_out=readLines(output_file)
 	stan_out=stan_out[-(1:grep("(Sampling)",stan_out)[1])]  
 	stan_out=stan_out[- which(stan_out=="") ]  
 	stan_out=stan_out[-  grep("Iteration",stan_out)  ]
@@ -288,8 +288,8 @@ path_fit <- function(sampling_model, data_list=list(), a_lower, a_upper, b, K_lo
 										 mu_logit, sigma_logit, K_gaussian, 
 										 mu_gaussian, sigma_gaussian, all_a, all_log_lik,
 										 N_grid=100, iter=2000, max_treedepth=8,thin=2,
-										 visualize_progress=FALSE){
-	sink('stan-output_path.txt', append=FALSE)
+										 visualize_progress=FALSE, output_file='stan-output_path.txt'){
+	sink(output_file, append=FALSE)
 	fit_main=sampling(sampling_model, data=c(list(a_lower=a_lower, a_upper=a_upper, 
 																			b=b, K_logit=K_logit, mu_logit=mu_logit, 
 																			sigma_logit=sigma_logit, K_gaussian=K_gaussian, 
@@ -298,7 +298,7 @@ path_fit <- function(sampling_model, data_list=list(), a_lower, a_upper, b, K_lo
 								chains=1, iter=iter, thin=thin, control=list(max_treedepth=max_treedepth)) # only support 1 chain
 	sink()
 	sim=extract(fit_main, permuted=FALSE)
-	extract_lp_maxrix=extract_lp()
+	extract_lp_maxrix=extract_lp(output_file)
 	a=sim[,,"a"]
 	a=a[-length(a)]
 	if( max (abs( extract_lp_maxrix$a - a))>0.01)
@@ -309,9 +309,9 @@ path_fit <- function(sampling_model, data_list=list(), a_lower, a_upper, b, K_lo
 	all_log_lik <- c(all_log_lik, log_lik)
 	gradients <- path_gradients(a_lower, a_upper, b, K_logit, mu_logit, sigma_logit, K_gaussian, mu_gaussian, sigma_gaussian, all_a, all_log_lik)
 	all_a_reflected = 1 - abs(1 - all_a)
-	path_post <- path_sampling(all_a_reflected, gradients$u_post, a_lower, a_upper)
+	path_post <- path_quadrature(all_a_reflected, gradients$u_post, a_lower, a_upper)
 	fit_measure <- max(abs(path_post$log_z))
-	path_lik <- path_sampling(all_a_reflected, gradients$u_lik, a_lower, a_upper)
+	path_lik <- path_quadrature(all_a_reflected, gradients$u_lik, a_lower, a_upper)
 	approx_grid <- approx(path_lik$a, path_lik$log_z, seq(0, 1, length=N_grid))
 	a_grid <- approx_grid$x
 	log_p_grid <- approx_grid$y
