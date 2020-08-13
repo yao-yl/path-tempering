@@ -16,8 +16,8 @@ block_end=function(stan_code) {
 	temp[!temp %in% grep(" \\}",stan_code)]   
 }
 
-arg_string_data=c(
-	"\t//argument:",
+aug_string_data=c(
+	"\t//augment:",
 	"\treal a_lower;",
 	"\treal a_upper;",
 	"\tint K_logit;",
@@ -30,7 +30,7 @@ arg_string_data=c(
 	"\t//original:"
 	)
 
-arg_string_trans_data_pre=c("\t//argument:",
+aug_string_trans_data_pre=c("\t//augment:",
 "\treal b_linear;",
 "\tvector[K_logit] b_logit;",
 "\tvector[K_gaussian] b_gaussian;",
@@ -38,14 +38,14 @@ arg_string_trans_data_pre=c("\t//argument:",
 )
 
 
-arg_string_trans_data_suffix=c(
+aug_string_trans_data_suffix=c(
 	"\tb_linear = b[1];",
 	"\tb_logit = segment(b, 2, K_logit);",
 	"\tb_gaussian = segment(b, 2 + K_logit, K_gaussian);"
 )
 
 
-arg_string_trans_parameter_pre=c("\t//argument transformed:",
+aug_string_trans_parameter_pre=c("\t//augment transformed:",
 	"\treal a_reflected;",    
 	"\treal a_scaled;",
 	"\treal lambda;",
@@ -54,7 +54,7 @@ arg_string_trans_parameter_pre=c("\t//argument transformed:",
 	"\t//original:")
 	
 	
-arg_string_trans_parameter_suffix=c(	
+aug_string_trans_parameter_suffix=c(	
 	"\ta_reflected = 1 - fabs(1 - a);",
 	"\ta_scaled = (a_reflected - a_lower)/(a_upper - a_lower);",
 	"\tif (a_scaled <= 0)",
@@ -67,7 +67,7 @@ arg_string_trans_parameter_suffix=c(
 	"\tkernel_gaussian = exp(-.5*(lambda - mu_gaussian) .* (lambda - mu_gaussian) ./ (sigma_gaussian .* sigma_gaussian));"
 )
 
-arg_string_model_define=c(
+aug_string_model_define=c(
 	"\treal log_q;//lp of the alternative model",
 	"\treal base_jacobian;//lp of the jacobian",
   "\treal log_p;//lp of the main model",
@@ -76,7 +76,7 @@ arg_string_model_define=c(
 
 
 
-arg_string_model=c(
+aug_string_model=c(
 	"\tlog_p = target()-base_jacobian;",
 	"\tprint(\" log_p = \", log_p,\" log_q = \", log_q, \" a = \", a);",
 	"\ttarget += (lambda-1)*log_p;",
@@ -85,7 +85,7 @@ arg_string_model=c(
 	"\ttarget += dot_product(kernel_logit, b_logit) + dot_product(kernel_gaussian, b_gaussian);"
 )
 
-code_tempeture_argument=function(stan_file=NULL){
+code_tempeture_augment=function(stan_file=NULL){
 	stan_code=readLines(stan_file)
 	if(sum(grep(" a;| a\\[| a ", stan_code))+ sum(grep(" lambda;| lambda\\[| lambda ", stan_code))>0 ) 
 		stop("Please reserve parameter name a and lambda")
@@ -95,9 +95,9 @@ code_tempeture_argument=function(stan_file=NULL){
 		stop("must contain one data block!")
 	if(length(line_data_start)==1){
 	line_data_start=block_start(stan_code)[min (which(block_start(stan_code) >= line_data_start))]
-	stan_code_new= add_line(string_vec=stan_code, add_line_id=line_data_start , arg_string_data)
+	stan_code_new= add_line(string_vec=stan_code, add_line_id=line_data_start , aug_string_data)
  	}else{
-	stan_code_new= c( "data{", arg_string_data, "}", stan_code)
+	stan_code_new= c( "data{", aug_string_data, "}", stan_code)
  	}
 	
 	# locate transformed data block
@@ -105,13 +105,13 @@ code_tempeture_argument=function(stan_file=NULL){
 	if(length(line_transformed_start)>1){stop("wrong format of transformed data")
 	} else if(length(line_transformed_start)==1) {
 		line_transformed_start=block_start(stan_code_new) [min (which(block_start(stan_code_new) >= line_transformed_start))]
-		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_start , arg_string_trans_data_pre)
+		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_start , aug_string_trans_data_pre)
 	  line_transformed_end=block_end(stan_code_new)[min (which(block_end(stan_code_new) >= line_transformed_start))]
-		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_end-1,  add_on=arg_string_trans_data_suffix)
+		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_end-1,  add_on=aug_string_trans_data_suffix)
 	}else{
 		line_data_start=which(grepl("data",stan_code_new)&!grepl("transformed",stan_code_new))
 		line_transformed_start=block_end(stan_code_new)[min (which(block_end(stan_code_new) >= line_data_start))]
-		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_start , c("transformed data {", arg_string_trans_data_pre,arg_string_trans_data_suffix, "}"))
+		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_start , c("transformed data {", aug_string_trans_data_pre,aug_string_trans_data_suffix, "}"))
 	}
 	
 	# locate parameters
@@ -126,12 +126,12 @@ code_tempeture_argument=function(stan_file=NULL){
 	if(length(line_transformed_start)>1){stop("wrong format of transformed parameters")
 	} else if(length(line_transformed_start)==1) {
 		line_transformed_start=block_start(stan_code_new) [min (which(block_start(stan_code_new) >= line_transformed_start))]
-		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_start , arg_string_trans_parameter_pre)
+		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_start , aug_string_trans_parameter_pre)
 		line_transformed_end=block_end(stan_code_new)[min (which(block_end(stan_code_new) >= line_transformed_start))]
-		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_end-1,  add_on=arg_string_trans_parameter_suffix)
+		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_end-1,  add_on=aug_string_trans_parameter_suffix)
 	}else{
 		line_transformed_start=block_end(stan_code_new)[min (which(block_end(stan_code_new) >= line_parameter_start))]
-		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_start , c("transformed parameters {", arg_string_trans_parameter_pre,arg_string_trans_parameter_suffix,	 "}"))			
+		stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_transformed_start , c("transformed parameters {", aug_string_trans_parameter_pre,aug_string_trans_parameter_suffix,	 "}"))			
 	}
 	line_model_alternative_start=which(grepl("alternative",stan_code_new) & grepl("model",stan_code_new) )
 	if(length(line_model_alternative_start)!=1)
@@ -152,9 +152,9 @@ code_tempeture_argument=function(stan_file=NULL){
 	alt_model=c(alt_model, "\tlog_q = target()-base_jacobian;",
 							"\ttarget += -log_q;")
 	stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_model_start,  
-													add_on=	c(arg_string_model_define, alt_model))
+													add_on=	c(aug_string_model_define, alt_model))
 	line_model_end=block_end(stan_code_new)[min (which(block_end(stan_code_new) >= line_model_start))]
-	stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_model_end-1,  add_on=arg_string_model)
+	stan_code_new= add_line(string_vec=stan_code_new, add_line_id=line_model_end-1,  add_on=aug_string_model)
 	
 	
 	#generated quantities
