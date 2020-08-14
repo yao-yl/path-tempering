@@ -1,11 +1,19 @@
-#  Adaptive Path Sampling in Metastable Posterior Distributions
+#   Adaptive Path Sampling and Continuous Tempering
 
-Code for paper  *Adaptive Path Sampling in Metastable Posterior Distributions* by  Yuling Yao, Collin  Cademartori, Aki Vehtari, Andrew Gelman.
+This package implements adaptive path sampling. It iteratively reduces the gap between the proposal and the target density, and provide a reliable  normalizing constant  estimation with practical diagnostic using importance sampling theory. 
+By equipping simulated tempering with a continuous temperature, path tempering enables efficient sampling from multimodal densities.    
 
-## Usage:
-`source("tempering_function.R")` will load all functions.  
+Reference:
+*Adaptive Path Sampling in Metastable Posterior Distributions* by  Yuling Yao, Collin  Cademartori, Aki Vehtari, Andrew Gelman.
 
-`code_temperature_augment()` constructs a geometric bridge between two densitis. It can often be driven by three motivations:
+## Installation in R
+```R
+library(devtools)
+devtools::install_github("yao-yl/path-tempering/package/pathtemp",  upgrade="never")
+``` 
+
+## Semaless integration in Stan
+The new `alternative model` block in Stan enables more than one model to be fit at the same time. To fully express a continous expansoon of these two models, a geometric bridge is contrtucted between two posterior densitis. Such design can often be driven by three motivations:
 1. In metastable sampling, we want to start from an easy-to-sample base density, which guides the target sampling. 
 2. In model expansion, we want to work with multiple models. We may also want to fit two models at the same time for both computation efficiency and model comparison. 
 3. We want to compute the marginal likelihood, or Bayes factor of two models.
@@ -92,7 +100,7 @@ alternative model{ // add a new block
 After saving this stan code to a  `cauchy.stan`, we run the function `code_temperature_augment()` that automatically constructs a tempered path between the original model and the alternative model:
 
 ```
-source("tempering_function.R")
+library(pathtemp)
 file_new=code_temperature_augment(stan_file="example/cauchy_mixture.stan")
 > output:
 > A new stan file has been created: cauchy_augmented.stan.
@@ -103,6 +111,8 @@ To run this example, call
 ```
 library(rstan)
 rstan_options(auto_write = TRUE)
+# compile stan optimizer
+update_model <- stan_model("solve_tempering.stan")
 # currently only supports 1 chain
 # generate the new stan file, please check if it is OK.
 # compile the new working model
