@@ -1,3 +1,7 @@
+#####
+cat("\n The file has been deprecated. Install the package instead")
+####
+
 add_line=function(string_vec, add_line_id, add_on){
 	if(length(string_vec)<add_line_id)
 		stop("wrong line id")
