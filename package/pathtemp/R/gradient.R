@@ -5,24 +5,42 @@
 #'
 #'
 #' @export
-#' ' @param  a_lower The lower bound of the quadrature. When a < a_lower, the invse
+#' @param  a_lower The lower bound of the quadrature. When a < a_lower, the inverse
 #' temperature  is 0 and the sample is from the base.
-#' @param a_upper The upper bound of the quadrature. When a > a_upper, the invse
+#' @param a_upper The upper bound of the quadrature. When a > a_upper, the inverse
 #' temperature  is 1 and the sample is from the target.
 #' @param b The current parameterization of the pseudo prior.
-#' @param K_logit a vector, pointwise gradient at those points.
-
-
+#' @param K_logit An integer, the length of the logit kernels.
+#' @param K_gaussian An integer, the length of the Gaussian kernels.
+#' @param sigma_logit The width of logit kernels.
+#' @param mu_logit The location of logit kernels.
+#' @param mu_gaussian The location of Gaussian kernels.
+#' @param sigma_gaussian The width of Gaussian kernels.
+#' @param a All sampled transformed parameters
+#' @param log_lik the pointwise log density difference between two models
 #'
 #' @details The function use numerical quadrature using trapezoid rule to compute
-#' the normalization constant from its potinwise gradient \code{u}.
+#' the normalization constant from its potinwise gradient \code{u}. For the gradient of
+#' the log normalization constant, the gradient is the sum of the log deritive of lambda,
+#' and the pointwise log density difference between two models. For the gradient of
+#' the log marginal density, the gradient is the sum of the previous two terms and the
+#' gradient of log pseudo prior.
 #'
-#' @return The pointwise  log normalization constant at all a.
+#' For current implementations, all these gradients terms have closed form.
+#'
+#' @return Names list of u_prior, u_lik, and u_post: the gradient of log pseudo prior,
+#' log normalization constant, and the log marginal density. These list can be used in
+#' nest adaptation in \code{\link{path_quadrature}}.
+#'
+#' @seealso \code{\link{path_quadrature}}
+#'
 #'
 #
 
 
-path_gradients <- function(a_lower, a_upper, b, K_logit, mu_logit, sigma_logit, K_gaussian, mu_gaussian, sigma_gaussian, a, log_lik){
+path_gradients <- function(a_lower=0.1, a_upper=0.8, b, K_logit, mu_logit, sigma_logit,
+													 K_gaussian, mu_gaussian, sigma_gaussian,
+													 a, log_lik){
 	N <- length(a)
 	a_reflected = 1 - abs(1 - a)
 	a_scaled <- (a_reflected - a_lower)/(a_upper - a_lower)

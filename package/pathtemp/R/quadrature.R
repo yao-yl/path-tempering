@@ -5,18 +5,21 @@
 #'
 #' @export
 #' @param a a vector, all sampled transformed parameters.
-#' @param u a vector, pointwise gradient at those points.
-#' @param  a_lower The lower bound of the quadrature. When a < a_lower, the invse
-#' temperature  is 0 and the sample is from the base.
-#' @param a_upper The upper bound of the quadrature. When a > a_upper, the invse
-#' temperature  is 1 and the sample is from the target.
+#' @param u a vector, pointwise gradient at those points. Often returned by
+#'  \code{\link{path_gradients}}.
+#' @param  a_lower The lower bound of the quadrature. When a < a_lower, the inverse
+#' temperature is 0 and the sample is from the base.
+#' @param a_upper The upper bound of the quadrature. When a > a_upper, the inverse
+#' temperature is 1 and the sample is from the target.
 
 #'
 #' @details The function use numerical quadrature using trapezoid rule to compute
-#' the normalization constant from its potinwise gradient \code{u}.
+#' the normalization constant from its pointwise gradient \code{u}.
 #'
 #' @return The pointwise  log normalization constant at all a.
-#'
+#' @references
+#' Gelman and Meng (1998). Simulating Normalizing Constants: From Importance Sampling to Bridge Sampling to Path Sampling. \emph{Statistical Science} \strong{13},
+#' 163-185.
 #
 path_quadrature <- function(a, u, a_lower=0.1, a_upper=0.8){
 	if(length(a)!=length(u))
