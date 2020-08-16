@@ -149,21 +149,21 @@ In this example, we fit two models (probit and logiistic regressions)in one join
 Let's consider a logit and probit link regression.  It is  avaialbe in `example/logit.stan`.
 ```stan
 data {
-	int n;
-	int y[n];
-	real x[n];
+   int n;
+   int y[n];
+   real x[n];
 }
 
 parameters {
-	real beta;
+   real beta;
 }
 model {
-  for (i in 1:n)
-    y[i]~ bernoulli_logit(beta * x[i]);
+   for (i in 1:n)
+     y[i]~ bernoulli_logit(beta * x[i]);
 }
 alternative model {
- for (i in 1:n)
-    y[i]~  bernoulli(Phi(beta * x[i]));
+   for (i in 1:n)
+     y[i]~  bernoulli(Phi(beta * x[i]));
 }
 
 ```
