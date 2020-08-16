@@ -61,11 +61,11 @@ parameter{
 real beta;
 }
 model{
-y ~  binomial_logit(1, x* beta);
+target +=  binomial_logit_ipmf(y| 1, x* beta);
 beta ~ normal(0,1);
 }
 alternative model{
-beta ~ normal(0,1);
+beta ~ normal(0,1); // the prior is allowed to be unnormalized, but it appers both here and above and has no effect for the marginal likelihood.
 }
 ```
 
