@@ -21,7 +21,9 @@ The new `alternative model` block in Stan enables more than one model to be fit 
 In any of these cases, just add another module `alternative model` to your stan code. For example, you want to sample a bimdoal distribution with a hot start:
 
 ```stan
-...
+parameter{
+real theta;
+}
 model{
 theta ~ cauchy(-10, 0.5);
 theta ~ cauchy(10, 0.5);
@@ -144,7 +146,7 @@ Here is the output:
 In this example, we fit two models (probit and logiistic regressions)in one joint sampling.  A path between them effectively expands the model continuously such both individual model are special cases of the augmented model. The computation efficiency is enhanced as we are fitting one slightly larger model rather than fitting two models. In addition,  the log normalization constant tells which models fits the data more, which is related to but not the same as log Bayes factor in model comparisons. 
 
 
-Let's consider a logit and probit link regression it is in 'example/logit.stan'.
+Let's consider a logit and probit link regression.  It is  avaialbe in `example/logit.stan`.
 ```stan
 data {
 	int n;
