@@ -141,7 +141,8 @@ Here is the output:
 
  
 ### Fitting logit and probit models together
-In this example, the goal is to fit two models together, so as to (a) expand the models and (b) enhance computation efficiency. 
+In this example, we fit two models (probit and logiistic regressions)in one joint sampling.  A path between them effectively expands the model continuously such both individual model are special cases of the augmented model. The computation efficiency is enhanced as we are fitting one slightly larger model rather than fitting two models. In addition,  the log normalization constant tells which models fits the data more, which is related to but not the same as log Bayes factor in model comparisons. 
+
 
 Let's consider a logit and probit link regression it is in 'example/logit.stan'.
 ```stan
@@ -183,6 +184,5 @@ Here is the output:
 ![logit exampl output](/example/img/logit.jpg)
 The log z here is NOT the Bayes factor! But it can be interpreted as the posterior density of lambda: hence telling which model is more supported by the the data.  
 Not surprisingly, the logit model fits the data better as that is how we generate y.
-
 
 
