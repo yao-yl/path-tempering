@@ -113,13 +113,14 @@ To run this example, call
 library(rstan)
 rstan_options(auto_write = TRUE)
 # compile stan optimizer
-update_model <- stan_model("solve_tempering.stan")
+update_model <- stan_model("solve_tempering.stan")# need to compile it first
 # currently only supports 1 chain
 # generate the new stan file, please check if it is OK.
 # compile the new working model
 sampling_model=stan_model(file_new)
 path_sample_fit=path_sample(sampling_model=sampling_model, data=list(gap=10), N_loop = 6, visualize_progress = TRUE, iter_final=6000 )
 ```
+Here `solve_tempering.stan` needs to be downloaded first. 
 
 The returned value `path_sample_fit` provides access to the posterior draws from the target and base density, the joint path,  and the log normalization constant:
 ```
