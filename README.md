@@ -69,6 +69,7 @@ beta ~ normal(0,1);
 
 
 ## Example:
+### Multimodal sampling
 Let's first construct a simple bimodal density:
 ```stan
 data {
@@ -138,6 +139,49 @@ Here is the output:
 ![cauchy exampl output](/example/img/Cauchy.jpg)
 
  
+### Fitting logit and probit models together
+In this example, the goal is to fit two models together, so as to (a) expand the models and (b) enhance computation efficiency. 
+
+Let's consider a logit and probit link regression it is in 'example/logit.stan'.
+```stan
+data {
+	int n;
+	int y[n];
+	real x[n];
+}
+
+parameters {
+	real beta;
+}
+model {
+  for (i in 1:n)
+    y[i]~ bernoulli_logit(beta * x[i]);
+}
+alternative model {
+ for (i in 1:n)
+    y[i]~  bernoulli(Phi(beta * x[i]));
+}
+
+```
+
+It is recommended to write `bernoulli_lpdf` if the goal is to compute the marginal likelihood.  
+
+We generate some x and y to fit this model
+```R
+file_new=code_temperature_augmented(stan_file="logit/logit.stan")
+sampling_model=stan_model(file_new)
+update_model <- stan_model("solve_tempering.stan")
+set.seed(100)
+n=30
+x=runif(n, 0,1)
+y=rbinom(n=n, size=1, prob=exp(3*x)/max( exp(3*x) +1) )
+path_sample_fit=path_sample(sampling_model=sampling_model, data=list(n=n, x=x, y=y), N_loop = 6, visualize_progress = TRUE,iter_final=6000)
+```
+
+Here is the output:
+![logit exampl output](/example/img/logit.jpg)
+The log z here is NOT the Bayes factor! But it can be interpreted as the posterior density of lambda: hence telling which model is more supported by the the data.  
+Not surprisingly, the logit model fits the data better as that is how we generate y.
 
 
 
