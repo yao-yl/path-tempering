@@ -68,7 +68,7 @@ path_sample=function(sampling_model,data_list, visualize_progress=FALSE,
 
 	# initialization:
 	b <- rep(0, 1 + K_logit + K_gaussian)
-	mu_logit <-  a_lower + (a_upper - a_lower)*seq(1,2*K_logit-1,2)/(K_logit)
+	mu_logit <-  a_lower + (a_upper - a_lower)*seq(1,2*K_logit-1,2)/(2*K_logit-1)
 	sigma_logit <- 2*rep((a_upper - a_lower)/K_logit, K_logit)
 	mu_gaussian <- mu_logit
 	sigma_gaussian <- sigma_logit
