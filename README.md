@@ -5,6 +5,7 @@ By equipping simulated tempering with a continuous temperature, path tempering e
 
 Reference:
 *Adaptive Path Sampling in Metastable Posterior Distributions* by  Yuling Yao, Collin  Cademartori, Aki Vehtari, Andrew Gelman.
+([Replication code]<https://github.com/yao-yl/path-tempering/tree/master/replication%20code%20for%20paper>)
 
 ## Installation in R
 ```R
