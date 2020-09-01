@@ -118,6 +118,7 @@ library(rstan)
 rstan_options(auto_write = TRUE)
 # compile stan optimizer
 update_model <- stan_model("solve_tempering.stan")# need to compile it first
+# https://github.com/yao-yl/path-tempering/blob/master/solve_tempering.stan
 # currently only supports 1 chain
 # generate the new stan file, please check if it is OK.
 # compile the new working model
