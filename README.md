@@ -3,9 +3,9 @@
 This package implements adaptive path sampling. It iteratively reduces the gap between the proposal and the target density, and provide a reliable  normalizing constant  estimation with practical diagnostic using importance sampling theory. 
 By equipping simulated tempering with a continuous temperature, path tempering enables efficient sampling from multimodal densities.    
 
-Reference:
+### Reference:
 *Adaptive Path Sampling in Metastable Posterior Distributions* by  Yuling Yao, Collin  Cademartori, Aki Vehtari, Andrew Gelman.
-([Replication code](https://github.com/yao-yl/path-tempering/tree/master/replication%20code%20for%20paper))
+([replication code](https://github.com/yao-yl/path-tempering/tree/master/replication%20code%20for%20paper), .[arXiv preprint]())
 
 ## Installation in R
 ```R
