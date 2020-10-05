@@ -1,26 +1,22 @@
 library(rstan)
-library(cowplot)
 library(MASS)
+library(loo)
 
 ######################################
 #Helper Functions & Configuration Data
 ######################################
 
+#Reflect transformed temperature into [0,1] range
 fold_a <- function(a){
   return(1-abs(1-a))
 }
 
-gen_simplex <- function(n){
-  S <- diag(n)
-  v <- ((1+sqrt(n+1))/n)*rep(1,n)
-  S <- rbind(S,v)
-  S <- t(apply(S,1,function(x){
-    w <-x- colMeans(S)
-    return(w/sqrt(sum(w^2)))
-  }))
-  return(S)
+#Generate centers (modes) for GMM
+gen_centers <- function(M,dims){
+  return(lapply(dims,function(d) return (matrix(rnorm(M*d),ncol=d))))
 }
 
+#Calculate parameteric marginal estimate at a point given coefficients
 smooth_est <- function(x,b){
   b_lin <- b[1]
   b_log <- b[2:(1+K_logit)]
@@ -36,6 +32,7 @@ smooth_est <- function(x,b){
   return(as.numeric(exp(b_lin*x + b_log%*%logit_ks + b_gaus%*%gauss_ks)))
 } 
 
+#Calculate how many points are closest to each mode in GMM
 assign_count <- function(assigns,n){
   counts <- sapply(1:n,function(k){
     return(sum(assigns == k))
@@ -43,20 +40,20 @@ assign_count <- function(assigns,n){
   return(counts)
 }
 
-lambda_list <- seq(0,1,0.1) # discrete (inverse) tempeture ladder
-n_lambda <- length(lambda_list)
-
+#Compute log of tempered GMM density for a given inverse temperature level
 log_temp_dist <- function(lambda,theta,centers,scale){
   M <- nrow(centers)
   target <- 0
   for (i in 1:M){
-    target <- target + (1/M)*prod(dnorm(theta,centers[i,],scale))
+    #target <- target + (1/M)*prod(dnorm(theta,centers[i,],scale))
+    target <- target + prod(dnorm(theta,centers[i,],scale))
   }
   log_target <- log(target)
   log_psi <- sum(dnorm(theta,0,1.5,log=TRUE))
   return(lambda*log_target+(1-lambda)*log_psi)
 }
 
+#Compute probability updates for Rao-Blackwellized algorithm
 update_probability=function(theta,r,z,centers,scale)
 {
   q_k=rep(0, n_lambda)
@@ -73,12 +70,16 @@ update_probability=function(theta,r,z,centers,scale)
   return(update_prob)
 }
 
+#Sample an inverse temperature according to the updating distribution
 tempeture_sample=function(theta,r,z,centers,scale)
 {
   update_prob=update_probability(theta,r,z,centers,scale)
   lambda_index=which(rmultinom(1, size=1, prob=update_prob)==1)
   return(lambda_index)
 }
+
+lambda_list <- seq(0,1,0.1) # discrete (inverse) tempeture ladder
+n_lambda <- length(lambda_list)
 
 #Configuration parameters for simulated tempering algorithm
 a_lower <- 0.1
@@ -99,7 +100,7 @@ conf_temp <- list(a_lower = a_lower,
                   sigma_gaussian = sigma_logit)
 
 #Tempered model and model for parametric prior approximation
-temp_mod <- stan_model("GMM.stan")
+temp_mod <- stan_model("GMM_2d.stan")
 temp_mod_disc <- stan_model("GMM_disc.stan")
 smooth_mod <- stan_model("solve_tempering.stan")
 
@@ -110,7 +111,7 @@ smooth_mod <- stan_model("solve_tempering.stan")
 #Function for simulated tempering algorithm
 cont_temper_path <- function(conf_temp, centers, scale_ratio = 4, temp_mod, smooth_mod, max_iter = 10, epsilon = 0.01, samp_iter = 1000, N_grid = 100, ad=0.8){
   sim_dist <- min(dist(centers))
-
+  
   b <- rep(0, 1 + K_logit + K_gaussian)
   temper_data <- list(a_lower=conf_temp$a_lower,
                       a_upper=conf_temp$a_upper,
@@ -126,7 +127,6 @@ cont_temper_path <- function(conf_temp, centers, scale_ratio = 4, temp_mod, smoo
                       mode_centers = centers,
                       mode_scale = sim_dist/scale_ratio)
   
-  fit_measure <- Inf
   iter <- 1
   draws_temp_cum <- list(a=c(),log_posterior=c(),log_psi=c())
   
@@ -134,13 +134,13 @@ cont_temper_path <- function(conf_temp, centers, scale_ratio = 4, temp_mod, smoo
   
   while(iter <= max_iter){
     print(paste("Running tempering iteration",iter))
+    time_start <- proc.time()
     fit_tempered <- sampling(temp_mod,data=temper_data,iter=samp_iter,chains=3,control=list(adapt_delta=ad),refresh=0)
     fit_draws_temp <- extract(fit_tempered,pars=c("a","log_posterior","log_psi"))
     draws_temp_cum <- lapply(1:3,function(var_num) c(fit_draws_temp[[var_num]],draws_temp_cum[[var_num]]))
     
     gradients <- path_gradients(conf_temp, b, draws_temp_cum[[1]], draws_temp_cum[[2]], draws_temp_cum[[3]])
     path_posterior <- path_sampling(fold_a(draws_temp_cum[[1]]), gradients$u_post, conf_temp$a_lower, conf_temp$a_upper)
-    #fit_measure <- max(abs(path_posterior$log_z))
     path_likelihood <- path_sampling(fold_a(draws_temp_cum[[1]]), gradients$u_lik, conf_temp$a_lower, conf_temp$a_upper)
     
     interp_grid <- approx(path_likelihood$a, path_likelihood$log_z, seq(0, 1, length=N_grid))
@@ -159,24 +159,36 @@ cont_temper_path <- function(conf_temp, centers, scale_ratio = 4, temp_mod, smoo
     b <- -smooth_path_fit$par$b
     temper_data$b <- b
     
+    log_ir <- -1*path_posterior$log_z
+    k_hat <- psis(log_ratios=log_ir,r_eff=NA)$diagnostics$pareto_k
+    
     interp_grid_prior <- approx(path_posterior$a, path_posterior$log_z, seq(0, 1, length=N_grid))
     prior_data <- smoothing_data
     prior_data$a <- interp_grid_prior$x
     prior_data$log_p <- interp_grid_prior$y
     prior_coefs <- optimizing(smooth_mod, data=prior_data, as_vector=FALSE)$par$b
-    history[[iter]] <- list(fit = fit_tempered,a_cum = fold_a(draws_temp_cum[[1]]), a = fold_a(fit_draws_temp$a), theta = extract(fit_tempered,pars="theta")$theta, prior_a = path_posterior, z_est = path_likelihood, coefs = prior_coefs)
+    
+    time_dur <- proc.time() - time_start
+    
+    history[[iter]] <- list(fit = fit_tempered,
+                            a_cum = fold_a(draws_temp_cum[[1]]), 
+                            a = fold_a(fit_draws_temp$a), 
+                            a_unfold = fit_draws_temp$a,
+                            theta = extract(fit_tempered,pars="theta")$theta, 
+                            prior_a = path_posterior, 
+                            z_est = path_likelihood, 
+                            coefs = prior_coefs,
+                            time_user = time_dur[1],
+                            time_elapsed = time_dur[3],
+                            k_hat = round(k_hat,2))
     
     iter <- iter+1
   }
   
-  # print("Running final fit.")
-  # final_fit <- sampling(temp_mod,data=temper_data,iter=10*samp_iter,chains=4,refresh=0)
-  # final_draws <- extract(final_fit,pars=c("a","theta"))
-  # theta_final <- final_draws$theta[fold_a(final_draws$a) > conf_temp$a_upper,]
-  # return(list(theta_final=theta_final,history=history, model=final_fit))
   return(list(history=history))
 }
 
+#Compute gradients needed for path sampling estimates
 path_gradients <- function(temp_conf, b, a, log_posterior, log_psi){
   N <- length(a)
   a_reflected = 1 - abs(1 - a)
@@ -206,6 +218,7 @@ path_gradients <- function(temp_conf, b, a, log_posterior, log_psi){
   return(list(u_prior=u_prior, u_lik=u_lik, u_post=u_post))
 }
 
+#Compute path sampling estimate using trapezoidal rule
 path_sampling <- function(a, u, a_lower=0, a_upper=1){
   keep <- (a > a_lower) & (a < a_upper)
   if (sum(keep) > 0){
@@ -247,7 +260,6 @@ cont_temper_imp <- function(conf_temp, centers, scale_ratio = 4, temp_mod, smoot
                       mode_centers = centers,
                       mode_scale = sim_dist/scale_ratio)
   
-  fit_measure <- Inf
   iter <- 1
   draws_temp_cum <- list(a=c(),log_posterior=c(),log_psi=c())
   
@@ -255,11 +267,18 @@ cont_temper_imp <- function(conf_temp, centers, scale_ratio = 4, temp_mod, smoot
   
   while(iter <= max_iter){
     print(paste("Running tempering iteration",iter))
+    
+    time_start <- proc.time()
+    
     fit_tempered <- sampling(temp_mod,data=temper_data,iter=samp_iter,chains=3,control=list(adapt_delta=ad),refresh=0)
     fit_draws_temp <- extract(fit_tempered,pars=c("a","log_posterior","log_psi"))
     draws_temp_cum <- lapply(1:3,function(var_num) c(fit_draws_temp[[var_num]],draws_temp_cum[[var_num]]))
     
     p_a_est <- density(fold_a(draws_temp_cum[[1]]))
+    
+    log_ir <- -1*log(p_a_est$y)
+    k_hat <- psis(log_ratios=log_ir,r_eff=NA)$diagnostics$pareto_k
+    
     interp_grid <- approx(p_a_est$x, p_a_est$y, seq(0, 1, length=N_grid))
     log_p_a_grid <- log(interp_grid$y)
     incl <- which(!is.na(log_p_a_grid))
@@ -285,20 +304,22 @@ cont_temper_imp <- function(conf_temp, centers, scale_ratio = 4, temp_mod, smoot
     z_est <- list(a=sampled_a,log_z=numeric(length=length(sampled_a)))
     z_est$log_z <- log(smooth_est(sampled_a,-b_old)) + log(smooth_est(sampled_a,prior_coefs))
     
+    time_dur <- proc.time() - time_start
+    
     history[[iter]] <- list(a_cum = fold_a(draws_temp_cum[[1]]), 
                             a = fold_a(fit_draws_temp$a), 
+                            a_unfold = fit_draws_temp$a,
                             theta = extract(fit_tempered,pars="theta")$theta, 
                             z_est = z_est, 
-                            coefs = prior_coefs)
+                            coefs = prior_coefs,
+                            time_user = time_dur[1],
+                            time_elapsed = time_dur[3],
+                            k_hat = round(k_hat,2))
     
     iter <- iter+1
   }
   
-  print("Running final fit.")
-  final_fit <- sampling(temp_mod,data=temper_data,iter=10*samp_iter,chains=4,refresh=0)
-  final_draws <- extract(final_fit,pars=c("a","theta"))
-  theta_final <- final_draws$theta[fold_a(final_draws$a) > conf_temp$a_upper,]
-  return(list(theta_final=theta_final,history=history, model=final_fit))
+  return(list(history=history))
 }
 
 ##########################################
@@ -316,14 +337,14 @@ disc_temper_imp <- function(centers, scale_ratio = 4, temp_mod_disc, max_iter = 
   
   Z=rep(1/n_lambda,n_lambda)
   r=rep(1/n_lambda,n_lambda)
-  fit_measure <- Inf
   iter <- 1
-  #draws_temp_cum <- list(a=c(),log_posterior=c(),log_psi=c())
   
   history <- vector(mode="list",length=max_iter)
   
   while(iter <= max_iter){
     print(paste("Running tempering iteration",iter))
+    
+    time_start <- proc.time()
     
     theta_sample <- matrix(nrow=samp_iter,ncol=ncol(centers))
     lambda_sample <- rep(NA,samp_iter)
@@ -349,12 +370,17 @@ disc_temper_imp <- function(centers, scale_ratio = 4, temp_mod_disc, max_iter = 
     
     Z <- Z*r[1]/r * c/c[1]
     z_est <- list(a = lambda_list, log_z = log(Z)-log(Z[1]))
+    
+    time_dur <- proc.time() - time_start
+    
     history[[iter]] <- list(z_est = z_est,
                             a = lambda_list[lambda_sample],
-                            theta = theta_sample)
+                            theta = theta_sample,
+                            time_user = time_dur[1],
+                            time_elapsed = time_dur[3])
     iter <- iter+1
   }
-
+  
   return(list(history=history))
 }
 
@@ -373,14 +399,14 @@ disc_temper_rb <- function(centers, scale_ratio = 4, temp_mod_disc, max_iter = 3
   
   Z=rep(1/n_lambda,n_lambda)
   r=rep(1/n_lambda,n_lambda)
-  fit_measure <- Inf
   iter <- 1
-  #draws_temp_cum <- list(a=c(),log_posterior=c(),log_psi=c())
   
   history <- vector(mode="list",length=max_iter)
   
   while(iter <= max_iter){
     print(paste("Running tempering iteration",iter))
+    
+    time_start <- proc.time()
     
     theta_sample <- matrix(nrow=samp_iter,ncol=ncol(centers))
     lambda_sample <- rep(NA,samp_iter)
@@ -406,246 +432,16 @@ disc_temper_rb <- function(centers, scale_ratio = 4, temp_mod_disc, max_iter = 3
     
     Z <- Z*r[1]/r * c/c[1]
     z_est <- list(a = lambda_list, log_z = log(Z)-log(Z[1]))
+    
+    time_dur <- proc.time() - time_start
+    
     history[[iter]] <- list(z_est = z_est,
                             a = lambda_list[lambda_sample],
-                            theta = theta_sample)
+                            theta = theta_sample,
+                            time_user = time_dur[1],
+                            time_elapsed = time_dur[3])
     iter <- iter+1
   }
   
   return(list(history=history))
-}
-
-###################
-#Plotting functions
-###################
-
-gen_centers <- function(M,dims){
-  return(lapply(dims,function(d) return (matrix(rnorm(M*d),ncol=d))))
-}
-
-gen_plots_cont_path <- function(centers_list){
-  dims <- lapply(centers_list,function(centers) return(ncol(centers)))
-  N <- length(dims)
-  temp_runs <- as.list(vector(length=N))
-  for (i in 1:N){
-    centers <- centers_list[[i]]
-    temp_runs[[i]] <- cont_temper_path(conf_temp,centers,6,temp_mod,smooth_mod,samp_iter = 4000,max_iter=30) 
-    plot_prior_a(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),ts=seq(1,30,3))
-    plot_norm_const(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),ts=seq(1,30,3))
-    #plot_mode_props(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),ts=seq(1,30,1),centers=centers)
-    if (dims[i] == 2){
-      plot_cross(temp_runs[[i]]$history,label="dim2")
-      plot_thetas(temp_runs[[i]]$history,label="dim2")
-    }
-  }
-  return(temp_runs)
-}
-
-gen_plots_cont_imp <- function(centers_list){
-  dims <- lapply(centers_list,function(centers) return(ncol(centers)))
-  N <- length(dims)
-  temp_runs <- as.list(vector(length=N))
-  for (i in 1:N){
-    centers <- centers_list[[i]]
-    temp_runs[[i]] <- cont_temper_imp(conf_temp,centers,6,temp_mod,smooth_mod,samp_iter = 4000, max_iter=30) 
-    plot_prior_a(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),ts=seq(1,30,3))
-    plot_norm_const(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),ts=seq(1,30,3))
-    #plot_mode_props(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),centers=centers)
-    if (dims[i] == 2){
-      plot_cross(temp_runs[[i]]$history,label="dim2")
-      plot_thetas(temp_runs[[i]]$history,label="dim2")
-    }
-  }
-  return(temp_runs)
-}
-
-gen_plots_disc_imp <- function(centers_list){
-  dims <- lapply(centers_list,function(centers) return(ncol(centers)))
-  N <- length(dims)
-  temp_runs <- as.list(vector(length=N))
-  for (i in 1:N){
-    centers <- centers_list[[i]]
-    temp_runs[[i]] <- disc_temper_imp(centers,6,temp_mod_disc,samp_iter = 1000,max_iter=30) 
-    plot_prior_a_disc(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),ts=seq(1,30,3))
-    plot_norm_const(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),ts=seq(1,30,3))
-    #plot_mode_props_disc(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),centers=centers)
-    if (dims[i] == 2){
-      plot_cross(temp_runs[[i]]$history,label="dim2")
-      plot_thetas(temp_runs[[i]]$history,label="dim2")
-    }
-  }
-  return(temp_runs)
-}
-
-gen_plots_disc_rb <- function(centers_list){
-  dims <- lapply(centers_list,function(centers) return(ncol(centers)))
-  N <- length(dims)
-  temp_runs <- as.list(vector(length=N))
-  for (i in 1:N){
-    centers <- centers_list[[i]]
-    temp_runs[[i]] <- disc_temper_rb(centers,6,temp_mod_disc,samp_iter = 1000,max_iter=30) 
-    plot_prior_a_disc(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),ts=seq(1,30,3))
-    plot_norm_const(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),ts=seq(1,30,3))
-    #plot_mode_props_disc(temp_runs[[i]]$history,label=paste("dim",dims[i],sep=''),centers=centers)
-    if (dims[i] == 2){
-      plot_cross(temp_runs[[i]]$history,label="dim2")
-      plot_thetas(temp_runs[[i]]$history,label="dim2")
-    }
-  }
-  return(temp_runs)
-}
-
-#Plotting functions
-plot_prior_a <- function(history,ts = c(1,3,5,7,10),label){
-  funcs <- lapply(ts,function(t){
-    b <- history[[t]]$coefs
-    func <- function(x) smooth_est(x,b)
-    vfunc <- Vectorize(func)
-    z_pr <- integrate(vfunc,lower=0,upper=1)$value
-    return(function(x) vfunc(x)/z_pr)
-  })
-  
-  plots <- as.list(vector(length=length(ts)))
-  iter <- 1
-  for (t in ts){
-    plots[[iter]] <- ggplot(data=data.frame(x=history[[t]]$a_cum),aes(x)) +
-      geom_histogram(aes(y=stat(20*count/sum(count))),breaks=seq(0,1,0.05)) + 
-      stat_function(fun = funcs[[iter]],color='red') +
-      xlab('a') + 
-      ylab('')
-    #ggsave(paste("plot_",label,"_",iter,".png"),plots[[iter]])
-    iter <- iter + 1
-  }
-  grid_plot <- plot_grid(plotlist=plots,labels=ts)
-  ggsave(paste("priors_",label,".png",sep=''),grid_plot,width=9,height=(1/3)*9)
-}
-
-plot_prior_a_disc <- function(history,ts = c(1,3,5,7,10),label){
-  plots <- as.list(vector(length=length(ts)))
-  iter <- 1
-  for (t in ts){
-    plots[[iter]] <- ggplot(data=data.frame(x=history[[t]]$a),aes(x)) +
-      geom_histogram() + 
-      xlab('a') + 
-      ylab('')
-    #ggsave(paste("plot_",label,"_",iter,".png"),plots[[iter]])
-    iter <- iter + 1
-  }
-  grid_plot <- plot_grid(plotlist=plots,labels=ts)
-  ggsave(paste("priors_",label,".png",sep=''),grid_plot,width=9,height=(1/3)*9)
-}
-  
-plot_norm_const <- function(history,ts = c(1,3,5,7,10),label){
-  plots <- as.list(vector(length=length(ts)))
-  iter <- 1
-  for (t in ts){
-    plots[[iter]] <- ggplot(data=data.frame(x=history[[t]]$z_est$a,y=history[[t]]$z_est$log_z),aes(x,y)) + 
-      geom_line() +
-      geom_point() + 
-      xlab('a') +
-      ylab('log(z)')
-    iter <- iter + 1
-  }
-  grid_plot <- plot_grid(plotlist=plots,labels=ts)
-  ggsave(paste("zs_",label,".png",sep=''),grid_plot,width=9,height=(1/3)*9)
-}
-
-plot_thetas <- function(history,ts = c(1,3,5,7,10),label){
-  plots <- as.list(vector(length=length(ts)))
-  iter <- 1
-  for (t in ts){
-    as <- history[[t]]$a
-    incl <- (as >= 0.8)
-    plots[[iter]] <- ggplot(data=data.frame(x=history[[t]]$theta[incl,1],y=history[[t]]$theta[incl,2]),aes(x,y)) + 
-      geom_point() + 
-      xlab('theta_1') +
-      ylab('theta_2') + 
-      theme(aspect.ratio = 1)
-    iter <- iter + 1
-  }
-  grid_plot <- plot_grid(plotlist=plots,labels=ts)
-  ggsave(paste("thetas_",label,".png",sep=''),grid_plot,width=9,height=6)
-}
-
-plot_cross <- function(history,t=10,k=5,label){
-  a_seq <- seq(0,1,length.out=k+1)
-  a_means <- vector(length=k)
-  iter <- 1
-  plots <- as.list(vector(length=k))
-  for (i in 1:k){
-    a_means[i] <- (a_seq[i+1]+a_seq[i])/2
-    ths <- history[[t]]$theta
-    as <- history[[t]]$a
-    incl <- ((as > a_seq[i]) & (as <= a_seq[i+1]))
-    plots[[iter]] <- ggplot(data=data.frame(x=history[[t]]$theta[incl,1],y=history[[t]]$theta[incl,2]),aes(x,y)) + 
-      geom_point() + 
-      xlab('theta_1') +
-      ylab('theta_2') + 
-      theme(aspect.ratio = 1)
-    iter <- iter + 1
-  }
-  grid_plot <- plot_grid(plotlist=plots,labels=paste("a~",a_means))
-  ggsave(paste("thetas_cross_",label,".png",sep=''),grid_plot,width=9,height=6)
-}
-
-plot_mode_props <- function(history,ts = seq(1,10,1),label,centers){
-  plots <- as.list(vector(length=length(ts)))
-  iter <- 1
-  props <- matrix(nrow=length(ts),ncol=nrow(centers))
-  for (t in ts){
-    as <- history[[t]]$a
-    incl <- (as >= 0.8)
-    thetas <- history[[t]]$theta[incl,]
-    assigns <- apply(thetas,1,function(th){
-      return(which.min(colSums((t(centers)-th)^2)))
-    })
-    new <- as.numeric(assign_count(assigns,nrow(centers)))/length(assigns)
-    if (length(new) == 0){
-      print('oops')
-    }
-    props[iter,] <- new
-    iter <- iter + 1
-  }
-  plot <- ggplot() + 
-    geom_hline(yintercept=(1/nrow(centers)),color='red') + 
-    xlab('Iteration') + 
-    ylab('Mode proportions') + 
-    ylim(0,1)
-  for (i in 1:(ncol(props))){
-    plot <- plot + geom_line(data=data.frame(x=ts,y=props[,i]),aes(x,y))
-  }
-  ggsave(paste("props_",label,".png",sep=''),plot,width=9,height=6)
-}
-
-plot_mode_props_disc <- function(history,ts = seq(1,10,1),label,centers){
-  plots <- as.list(vector(length=length(ts)))
-  iter <- 1
-  props <- matrix(nrow=length(ts),ncol=(ncol(centers)+1))
-  for (t in ts){
-    as <- history[[t]]$a
-    incl <- (as == 1)
-    if (sum(incl)>1){
-      thetas <- history[[t]]$theta[incl,]
-      assigns <- apply(thetas,1,function(th){
-        return(which.min(colSums((t(centers)-th)^2)))
-      })
-      new <- as.numeric(assign_count(assigns,nrow(centers)))/length(assigns)
-      if (length(new) == 0){
-        print('oops')
-      }
-      props[iter,] <- new  
-    } else {
-      props[iter,] <- rep(0,nrow(centers))
-    }
-    iter <- iter + 1
-  }
-  plot <- ggplot() + 
-    geom_hline(yintercept=(1/(ncol(centers)+1)),color='red') + 
-    xlab('Iteration') + 
-    ylab('Mode proportions') + 
-    ylim(0,1)
-  for (i in 1:(ncol(props))){
-    plot <- plot + geom_line(data=data.frame(x=ts,y=props[,i]),aes(x,y))
-  }
-  ggsave(paste("props_",label,".png",sep=''),plot,width=9,height=6)
 }
