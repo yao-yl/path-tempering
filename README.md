@@ -3,8 +3,9 @@
 This package implements adaptive path sampling. It iteratively reduces the gap between the proposal and the target density, and provide a reliable  normalizing constant  estimation with practical diagnostic using importance sampling theory. 
 By equipping simulated tempering with a continuous temperature, path tempering enables efficient sampling from multimodal densities.    
 
-Reference:
+### Reference:
 *Adaptive Path Sampling in Metastable Posterior Distributions* by  Yuling Yao, Collin  Cademartori, Aki Vehtari, Andrew Gelman.
+([replication code](https://github.com/yao-yl/path-tempering/tree/master/replication%20code%20for%20paper), [arXiv preprint](https://arxiv.org/abs/2009.00471))
 
 ## Installation in R
 ```R
@@ -117,6 +118,7 @@ library(rstan)
 rstan_options(auto_write = TRUE)
 # compile stan optimizer
 update_model <- stan_model("solve_tempering.stan")# need to compile it first
+# https://github.com/yao-yl/path-tempering/blob/master/solve_tempering.stan
 # currently only supports 1 chain
 # generate the new stan file, please check if it is OK.
 # compile the new working model
